@@ -37,7 +37,7 @@ from .bht import BasinHierarchyTree
 #Class for graph input
 class TopologicalFilterGraph(MethodLoaderMixin):
   def __init__(self, input=None, method="cpp", dual=False, recursive=True, is_triangulated=False):
-    self.method = self.load_method(method, __package__) # python, numba or C++
+    self.method = self.load_link_reduce(method, __package__) # python, numba or C++
     self.modified = None
     self.G = None # graph structure
     self.pos = None #position for drawing graph

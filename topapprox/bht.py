@@ -62,7 +62,7 @@ class BasinHierarchyTree():
         Recursively appends descendants of a vertex `v` to the provided list `desc`.
 
     """
-    def __init__(self, *, recursive=True) -> None:
+    def __init__(self, *, recursive=True, dual=False) -> None:
         self.parent = None
         self.children = None
         self.persistent_children = None
@@ -74,6 +74,7 @@ class BasinHierarchyTree():
         self.recursive = recursive
         self.get_descendants = self.get_descendants_recursive if recursive else self.get_descendants_iterative
         self._describe_pers = None
+        self.dual = dual
 
 
     def _low_pers_filter(self, epsilon):
@@ -218,10 +219,15 @@ class BasinHierarchyTree():
         # if not self.persistence is None:
         #     return self.persistence
 
-        #(birth, death, birth_location, death_location, basin_size, depth, height)
-        self.persistence = np.array([[self.birth[v], self.birth[self.linking_vertex[v]], v, 
+        if not self.dual:
+            #(birth, death, birth_location, death_location, basin_size, depth, height)
+            self.persistence = np.array([[self.birth[v], self.birth[self.linking_vertex[v]], v, 
                                       self.linking_vertex[v], self.basin_size(v), self.get_depth(v), 
                                       self.get_positive_pers_height(v)] for v in self.positive_pers])
+        else:
+            self.persistence = np.array([[-self.birth[self.linking_vertex[v]], -self.birth[v], self.linking_vertex[v],
+                                           v, self.basin_size(v), self.get_depth(v), 
+                                           self.get_positive_pers_height(v)] for v in self.positive_pers])
         self._describe_pers = """[birth, death, birth_vertex, death_vertex, basin_size, depth_in_BHT, height_in_BHT]
 
             birth:..............birth time of cycle.

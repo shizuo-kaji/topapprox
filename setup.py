@@ -14,19 +14,30 @@ if platform.system() == 'Darwin':  # macOS
 else:
     extra_compile_args = ['-std=c++11']
 
+
+include_dirs = [pybind11.get_include()]
+
 ext_modules = [
     Pybind11Extension(
         'topapprox.link_reduce_cpp',
         ['topapprox/link_reduce_cpp.cpp'],
-        include_dirs=[pybind11.get_include()],
+        include_dirs=include_dirs,
         language='c++',
-        extra_compile_args = extra_compile_args + ['-O3', '-Wall', '-shared'],
+        extra_compile_args=extra_compile_args + ['-O3', '-Wall', '-shared'],  # Optimization flags
+    ),
+    Pybind11Extension(
+        'topapprox.bht_cpp',
+        ['topapprox/bht_cpp.cpp'],
+        include_dirs=include_dirs,
+        language='c++',
+        extra_compile_args=extra_compile_args + ['-O3', '-Wall', '-shared'], 
     ),
 ]
 
 setup(
     name='topapprox',
-    author='Matias de Jong van Lier, Junyan Chu, Sebastían Elías Graiff Zurita, Shizuo Kaji',
+    version='1.0',
+    author='Matias de Jong van Lier, Junyan Chu, Sebastián Elías Graiff Zurita, Shizuo Kaji',
     description='A module for topological low persistence filter',
     packages=find_packages(),
     ext_modules=ext_modules,

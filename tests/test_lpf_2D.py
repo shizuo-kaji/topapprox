@@ -27,7 +27,7 @@ def check_BHT(uf, bht_expected):
     if (np.all(parent == bht_expected[0]) 
                     and np.all(linking_vertex == bht_expected[1]) 
                     and root == bht_expected[2]
-                    and children == bht_expected[3]
+                    and np.all([set(children[k]) == set(bht_expected[3][k]) for k in range(len(children))])
                     ):
         return True, " "
     return False, f"""(2D simple case): BHTs are different. \n

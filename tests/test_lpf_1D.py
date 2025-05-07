@@ -9,6 +9,7 @@ Furthermore, for each case it checks if the BHT is computed correctly.
 import pytest
 from topapprox import TopologicalFilterImage, TopologicalFilterGraph
 import numpy as np
+from .helpers import check_bht
 
 
 def test_1D_simple_python():
@@ -43,16 +44,13 @@ def aux_1D_simple(method):
              [None, 5.5, np.array([[5,5,5,5,5,5,5,5,5,5,-1]])]
             ]
     # bhts for `tests`, ordered in the following way
-    # test1 -> parent, linking_vertex, root, children
-    tests_bhts = [[np.array([0,0,0]), 
-                   np.array([ -1, 1, 1]),
-                   0,
-                   [[1, 2], [], []]
+    # test1 -> possible_parent, possible_linking_vertices
+    lv2 = np.array([ 1,  1, -1,  3,  3,  5,  5,  7])
+    tests_bhts = [[[np.array([0,0,0]), np.array(0,2,0)], 
+                   [np.array([ -1, 1, 1]), np.array([ -1, 1, 1])],
                    ],
-                  [np.array([2, 0, 2, 2, 2, 2, 2, 6]), 
-                   np.array([ 1,  1, -1,  3,  3,  5,  5,  7]),
-                   2,
-                   [[1], [], [3, 4, 0, 5, 6], [], [], [], [7], []]
+                  [[np.array([2, x, 2, y, 2, z, 2, 6]) for x in [0,2] for y in [2,4] for z in [2,6]], 
+                   [lv2 for i in range(8)],
                    ],
                    [[10,  0,  0,  4,  0,  0,  0,  0,  0,  0, 10],
                     [ 9,  1,  2,  4,  2,  5,  5,  7,  7,  9, -1],
@@ -69,11 +67,13 @@ def aux_1D_simple(method):
         result = uf.low_pers_filter(tests[i][1])
         assert np.all(result == tests[i][2]), "The resulting function is not as expected (1D simple case)"
         if first_run:
+            #TODO: Finish this part
+            is_bht_ok = check_bht(uf.bht.parent, uf.bht.linking_vertex, )
             parent, linking_vertex, root, children = uf.get_BHT(with_children=True)
             assert (np.all(parent == tests_bhts[j][0]) 
                     and np.all(linking_vertex == tests_bhts[j][1]) 
                     and root == tests_bhts[j][2]
-                    and children == tests_bhts[j][3]
+                    and np.all([set(children[k]) == set(tests_bhts[j][3][k]) for k in range(len(children))])
                     ), f"""(1D simple case): BHTs are different. \n
                     Predicted BHT: \n
                     Parents:          {tests_bhts[j][0]}\n

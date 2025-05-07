@@ -185,7 +185,7 @@ void neighbors_3D(int v, std::tuple<int, int, int> shape, std::vector<int>& nbs,
     int j = (v / l) % m;
     int k = v % l;
     std::vector<bool> condition = {i==0, i==n-1, j==0, j==m-1, k==0, k==l-1};
-    std::vector<int> increment = {-1, 1, -m, m, -m*l, m*l};
+    std::vector<int> increment = {-m*l, m*l, -l, l, -1, 1};
 
     int idx;
     for (idx=0; idx<6; ++idx){
