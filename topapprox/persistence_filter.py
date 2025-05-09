@@ -1,3 +1,8 @@
+""" This version is still a work in progress, not used yet
+The idea is to merge image and graph filtering in a single class
+"""
+
+
 import numpy as np
 from .filter_image import TopologicalFilterImage
 from .filter_graph import TopologicalFilterGraph

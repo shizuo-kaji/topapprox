@@ -1,68 +1,53 @@
-"""
-Graph with faces class
-
-This class is used to represent a graph with faces.
-By passing a signal value the edges are automatically sorted accordingly.
-One can compute the dual of the graph with faces by setting `compute` to "dual",
-if it is set to "both", then both the normal and dual versions will be computed
-"""
-
-
 import numpy as np
 
 class GraphWithFaces:
-    def __init__(self, F=None, H=None, E=None, signal=None, compute="normal", is_triangulated=False):
-        """
-        Initializes the graph with faces. Faces (F) and holes (H) should be
-        lists of lists, where each inner list represents a sequence of vertices
-        that form a face or hole.
+    """
+    GraphWithFaces represents a graph defined by its faces and holes. When the object
+    is not a cell complex a set of edges is also needed.
+    It supports computing both the primal and dual graphs, and allows sorting edges
+    based on a scalar signal defined on vertices.
 
-        :param F: List of faces, each face is a list of vertices.
-        :param H: List of holes, each hole is a list of vertices.
-        :param E: (optional) numpy array  of shape (n,2), with n being the number of edges,
-        each entry should be one edge.
-            If the graph embedding is such that each face is homeomorphic to an open disk 
-            and its boundary is homemorphic to a circle, then there is no need to pass a list
-            of edges, as long as the faces an holes are given in an appropriate order (each face
-            or hole should be written for example as face = [1,2,3,4], meaning that 12, 23, 34 and 41
-            are the edges forming that face/hole).
-        :param signal: A NumPy array of shape (n_vertices,) representing the function values.
-        :param compute: A string, can be either "normal", "dual" or "both"
-        :param ismesh: bool, if True a special case is considered for mesh (all faces are triangles). Holes can be anything.
-        """
-        self.F = F if F is not None else []
-        self.H = H if H is not None else []
+    Parameters:
+    -----------
+    F : list of lists of int
+        Faces of the graph, each face is a list of vertex indices starting at 0.
+    H : list of lists of int
+        Holes in the graph, each hole is a list of vertex indices.
+    E : np.ndarray of shape (n, 2), optional
+        List of edges. If not provided, edges are inferred from F and H.
+    signal : np.ndarray of shape (n_vertices,)
+        Scalar values defined at vertices, used for edge sorting.
+    compute : {'normal', 'dual', 'both'}
+        Whether to compute only the primal graph, only the dual, or both.
+    is_triangulated : bool
+        If True, the graph is assumed to be a triangular mesh.
+    """
+    
+    def __init__(self, F=None, H=None, E=None, signal=None, compute="normal", is_triangulated=False):
+        self.F = F 
+        self.H = H
         self.E = E
         self.signal = signal
         self.E_signal = None
-        self.compute = compute
-        self.vertex_count = signal.shape[0]
-        self.is_triangulated = is_triangulated
-        # Automatically determine edges from F and H if provided
         self.dualE = set()
         self.dualE_signal = None
-        if is_triangulated:
-            self.signal = np.concatenate((signal, np.full(len(H), np.inf)))
-        else:
-            self.signal = np.concatenate((signal, np.array([max([signal[v] for v in f]) for f in F]), np.full(len(H), np.inf)))
+        self.compute = compute
+        self.is_triangulated = is_triangulated
+        self.vertex_count = signal.shape[0]
+        self._extend_signal()
+
         if self.E is None:
             self.E = set()
             self._determine_E()
         elif compute != "normal":
             self._compute_dual()
         else:
-            edges = np.array(list(self.E), dtype=np.uint32)
-            # Compute the max signal value for each edge
-            edge_signals = np.maximum(self.signal[edges[:, 0]], self.signal[edges[:, 1]])
-            # Sort edges by signal values
-            sorted_indices = np.argsort(edge_signals)
-            self.E_signal = edge_signals[sorted_indices]
-            self.E = edges[sorted_indices]
-
-
-       
+            self._finalize_edges()
 
     def __str__(self):
+        """
+        Returns a human-readable string representation of the object.
+        """
         return (
             f"Faces: {self.F},\n"
             f"Holes: {self.H},\n"
@@ -74,101 +59,103 @@ class GraphWithFaces:
         )
 
     def __repr__(self):
+        """
+        Returns a developer-friendly representation of the object.
+        """
         return f"GraphWithFaces(F={self.F}, H={self.H}, signal={self.signal}, E={self.E}, E_signal={self.E_signal})"
+
+    def _extend_signal(self):
+        """
+        Extends the input signal by adding values for face and hole centers,
+        as needed for dual vertex construction. Faces get max signal value
+        of their vertices, holes get +inf.
+        """
+        if self.is_triangulated:
+            self.signal = np.concatenate((self.signal, np.full(len(self.H), np.inf)))
+        else:
+            maxF = [max([self.signal[v] for v in f]) for f in self.F]
+            self.signal = np.concatenate((self.signal, np.array(maxF), np.full(len(self.H), np.inf)))
+
+    def _finalize_edges(self):
+        """
+        Sorts edges and dual edges by signal values (maximum value along edge).
+        Also stores edge signal arrays used for downstream filtering.
+        """
+        def sort_edges(edge_set, negate=False):
+            edges = np.array(list(edge_set), dtype=np.uint32)
+            values = self.signal if not negate else -self.signal
+            edge_signals = np.maximum(values[edges[:, 0]], values[edges[:, 1]])
+            sorted_idx = np.argsort(edge_signals)
+            return edges[sorted_idx], edge_signals[sorted_idx]
+
+        if self.compute in {"normal", "both"}:
+            self.E, self.E_signal = sort_edges(self.E)
+
+        if self.compute in {"dual", "both"}:
+            self.dualE, self.dualE_signal = sort_edges(self.dualE, negate=True)
 
     def _determine_E(self):
         """
-        Determines the edge set E based on the faces (F) and holes (H), and sorts it by signal values.
+        Infers edge set from the boundary of faces and holes.
+        Also builds dual edges if needed and sorts all edges.
         """
-        # Step 1: Add edges from faces and holes
         for face in self.F:
             self._add_edges(face)
-        n = len(self.H) - 1 if self.compute == "normal" else len(self.H)
-        for i in range(n): # We can skip the final face, since all its edges were already included
+        for i in range(len(self.H) - (self.compute == "normal")):
             self._add_edges(self.H[i], ishole=True)
-
-        if self.compute == "normal" or self.compute == "both":
-            # Convert set of edges to numpy array for efficient operations
-            edges = np.array(list(self.E), dtype=np.uint32)
-            # Compute the max signal value for each edge
-            edge_signals = np.maximum(self.signal[edges[:, 0]], self.signal[edges[:, 1]])
-            # Sort edges by signal values
-            sorted_indices = np.argsort(edge_signals)
-            self.E_signal = edge_signals[sorted_indices]
-            self.E = edges[sorted_indices]
-
-        if self.compute == "dual" or self.compute == "both":
-            # Convert set of edges to numpy array for efficient operations
-            dual_edges = np.array(list(self.dualE), dtype=np.uint32)
-            # Compute the max signal value for each edge
-            dual_edge_signals = np.maximum(-self.signal[dual_edges[:, 0]], -self.signal[dual_edges[:, 1]])
-            # Sort edges by signal values
-            dual_sorted_indices = np.argsort(dual_edge_signals)
-            self.dualE_signal = dual_edge_signals[dual_sorted_indices]
-            self.dualE = dual_edges[dual_sorted_indices]
-        
+        self._finalize_edges()
 
     def _add_edges(self, sequence, *, ishole=False):
         """
-        Adds edges for a given sequence of vertices, which can be a face or hole.
-        :param sequence: A list of vertices.
+        Adds primal and/or dual edges from a sequence of vertices (face or hole).
+
+        Parameters:
+        -----------
+        sequence : list of int
+            A closed walk representing a face or hole.
+        ishole : bool
+            Whether the sequence represents a hole (affects triangulated treatment).
         """
         n = len(sequence)
-        if self.compute == "normal" or (self.is_triangulated and not ishole):
-            for i in range(n):
-                v1, v2 = sequence[i], sequence[(i + 1) % n]
-                if v1 > v2:  # Manually check for edge direction to avoid sorting
-                    v1, v2 = v2, v1
-                self.E.add((v1, v2))  # Use set for fast duplicate detection
-        elif self.compute == "dual":
-            v3 = self.vertex_count # extra vertex
-            self.vertex_count += 1
-            for i in range(n):
-                v1, v2 = sequence[i], sequence[(i + 1) % n]
-                self.dualE.add((v1, v3))
-                if v1 > v2:  # Manually check for edge direction to avoid sorting
-                    v1, v2 = v2, v1
-                self.dualE.add((v1, v2))
-        elif self.compute == "both":
-            v3 = self.vertex_count # extra vertex
-            self.vertex_count += 1
-            for i in range(n):
-                v1, v2 = sequence[i], sequence[(i + 1) % n]
-                self.dualE.add((v1, v3))
-                if v1 > v2:  # Manually check for edge direction to avoid sorting
-                    v1, v2 = v2, v1
-                self.E.add((v1, v2))
-                self.dualE.add((v1, v2))
+        need_dual = self.compute in {"dual", "both"}
+        need_primal = self.compute in {"normal", "both"} or (self.is_triangulated and not ishole)
 
-        if self.is_triangulated and (self.compute != "normal") and ishole:
+        add_edge = lambda u, v, dest: dest.add((min(u, v), max(u, v)))
+
+        if need_dual:
+            v3 = self.vertex_count
+            self.vertex_count += 1
+
+        for i in range(n):
+            v1, v2 = sequence[i], sequence[(i + 1) % n]
+            if need_primal:
+                add_edge(v1, v2, self.E)
+            if need_dual:
+                self.dualE.add((v1, v3))
+                add_edge(v1, v2, self.dualE)
+
+        if self.is_triangulated and need_dual and ishole:
             v3 = self.vertex_count
             self.vertex_count += 1
             for v in sequence:
                 self.dualE.add((v, v3))
 
-
     def _compute_dual(self):
-        """ Computes the dual graph from the graph with faces
-        Each face/hole becomes a new vertex which is attached by edges to all the 
-        vertices in the face/hole. 
         """
-        # Add edges from faces and holes
+        Computes the dual graph: each face/hole becomes a new vertex,
+        connected to all vertices in the corresponding face/hole.
+        """
+        def connect_dual_vertex(polygon):
+            v_new = self.vertex_count
+            self.vertex_count += 1
+            for v in polygon:
+                self.dualE.add((v, v_new))
+
         if not self.is_triangulated:
             for face in self.F:
-                v_new = self.vertex_count # extra vertex
-                self.vertex_count += 1
-                for v in face:
-                    self.dualE.add((v,v_new))
+                connect_dual_vertex(face)
         for hole in self.H:
-                v_new = self.vertex_count # extra vertex
-                self.vertex_count += 1
-                for v in hole:
-                    self.dualE.add((v,v_new))
-        dual_edges = np.array(list(self.dualE), dtype=self.E.dtype)
-        dual_edges = np.vstack((self.E, dual_edges))
-        # Compute the max signal value for each edge
-        dual_edge_signals = np.maximum(-self.signal[dual_edges[:, 0]], -self.signal[dual_edges[:, 1]])
-        # Sort edges by signal values
-        dual_sorted_indices = np.argsort(dual_edge_signals)
-        self.dualE_signal = dual_edge_signals[dual_sorted_indices]
-        self.dualE = dual_edges[dual_sorted_indices]
+            connect_dual_vertex(hole)
+
+        self.dualE = np.vstack((np.array(list(self.E), dtype=np.uint32), np.array(list(self.dualE), dtype=np.uint32)))
+        self._finalize_edges()
