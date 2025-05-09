@@ -89,7 +89,11 @@ class TopologicalFilterImage(MethodLoaderMixin):
         
     def _update_BHT(self):
         '''Updates BHT via link_reduce method.
-        One essential ingredient for obtaining the BHT is edge ordering.'''
+        One essential ingredient for obtaining the BHT is edge ordering.
+        
+        TODO: The BHT cpp method is not working properly yet, some testing
+        and improvement is still needed.
+        '''
 
         if self.iter_vertex or self.is_3D:
             result = self._link_reduce(self.bht_birth, self.shape, self.dual)

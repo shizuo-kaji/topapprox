@@ -36,8 +36,12 @@ from .bht import BasinHierarchyTree
 
 #Class for graph input
 class TopologicalFilterGraph(MethodLoaderMixin):
-  def __init__(self, input=None, method="cpp", dual=False, recursive=True, is_triangulated=False):
+  def __init__(self, input=None, method="cpp", bht_method="python", dual=False, recursive=True, is_triangulated=False):
+    self.recursive = recursive
+    self.dual = dual
     self.method = self.load_link_reduce(method, __package__) # python, numba or C++
+    self.bht_method = self.load_bht(bht_method, __package__) #from MethodLoaderMixin
+    self.bht = self.BHT_Class(recursive=self.recursive, dual=self.dual)
     self.modified = None
     self.G = None # graph structure
     self.pos = None #position for drawing graph
@@ -48,20 +52,18 @@ class TopologicalFilterGraph(MethodLoaderMixin):
     self.shape = None
     self.gwf = None
     self.is_triangulated = is_triangulated
-    self.dual = dual
-    self.bht = BasinHierarchyTree(recursive=recursive)
     self.compute = "dual" if self.dual else "normal"
     if isinstance(input,np.ndarray):
       self.from_array(input)
     elif input is not None:
       raise ValueError(f"Unknown initialisation type")
 
-  def compute_gwf(self, F: list, H: list, signal: np.ndarray):
+  def compute_gwf(self, F: list, H: list, signal: np.ndarray, E=None):
     """Computes the graph with faces
     """
     # TODO: adapt this class so that it is possible to compute normal 
     # and dual for the same class to optimize
-    self.gwf = GraphWithFaces(F=F, H=H, signal=signal, compute=self.compute, is_triangulated=self.is_triangulated)
+    self.gwf = GraphWithFaces(F=F, H=H, E=E, signal=signal, compute=self.compute, is_triangulated=self.is_triangulated)
 
 
   ## create a graph with faces from image
