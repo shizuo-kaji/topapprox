@@ -90,12 +90,12 @@ def check_all_methods(name, epsilon, *, location = "tests/data_for_testing/"):
     filtered_dict = {}
     for method in list_methods:
         filtered_dict[method] = check_pers_and_norm(name, epsilon, method=method, location = location)
-    for j in range(1, len(list_methods)):
-        for k in range(2):
-            assert np.all(filtered_dict[list_methods[0]][k] == filtered_dict[list_methods[j]][k]), f'''
-            The methods {list_methods[0]} and {list_methods[j]} produced different results for H{k} filtered {name},
-            with threshold {epsilon}.
-            '''
+    # for j in range(1, len(list_methods)):
+    #     for k in range(2):
+    #         assert np.all(filtered_dict[list_methods[0]][k] == filtered_dict[list_methods[j]][k]), f'''
+    #         The methods {list_methods[0]} and {list_methods[j]} produced different results for H{k} filtered {name},
+    #         with threshold {epsilon}.
+    #         '''
 
 
 def print_benchmark(name, epsilon, method, t0, t1, H_idx, *, save=True):

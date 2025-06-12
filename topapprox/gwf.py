@@ -14,7 +14,10 @@ class GraphWithFaces:
     H : list of lists of int
         Holes in the graph, each hole is a list of vertex indices.
     E : np.ndarray of shape (n, 2), optional
-        List of edges. If not provided, edges are inferred from F and H.
+        List of edges. If not provided, edges are inferred from F and H, which is
+        only possible when the graph with faces is a cell complex, meaning that
+        each face should be homeomorphic to an open disk and its boundary
+        homeomorphic to a circle. In any other case the set of edges should be provided.
     signal : np.ndarray of shape (n_vertices,)
         Scalar values defined at vertices, used for edge sorting.
     compute : {'normal', 'dual', 'both'}

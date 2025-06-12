@@ -81,8 +81,8 @@ def link_reduce_wrapper(birth, edges, epsilon, keep_basin=False):
     a,b,c,d,e,f = _link_reduce_numba(birth, edges, epsilon, keep_basin=keep_basin)
     return a,b,c,d,e,np.array(f)
 
-def link_reduce_vertices_wrapper(birth, shape):
-    a,b,c,d,e,f = _link_reduce_vertices_numba(birth, shape)
+def link_reduce_vertices_wrapper(birth, shape, dual=False):
+    a,b,c,d,e,f = _link_reduce_vertices_numba(birth, shape, dual=dual)
     return a,b,c,d,e,np.array(f)
 
 
@@ -101,11 +101,13 @@ def link_reduce_vertices_wrapper(birth, shape):
 
 
 @njit(parallel=True, fastmath=True)
-def _link_reduce_vertices_numba(birth, shape):
+def _link_reduce_vertices_numba(birth, shape, dual=False):
     '''Link reduce function iterating over vertices (instead of edges)
     '''
 
     n,m = shape
+    if dual:
+        birth = np.concatenate((birth, np.array([n*m]))) # add infty vertex
     vertices_ordered = np.argsort(birth)
     vertex_birth_index = np.argsort(vertices_ordered) # if vertex_birth_index[v] = 7, then v is the 8th vertex in the ordering
     #persistence = [(birth.min(), np.inf, birth.argmin())]
@@ -128,7 +130,7 @@ def _link_reduce_vertices_numba(birth, shape):
     #neighbors = np.empty(4, dtype=np.uint32)
     for v in vertices_ordered:
         #neighbors[:] = _neighbors
-        neighbors = _neighbors(v, (n,m))
+        neighbors = _neighbors(v, (n,m), dual=dual)
         for u in neighbors:
             if u > -1:
                 if vertex_birth_index[u] < vertex_birth_index[v]:
@@ -154,12 +156,26 @@ def _link_reduce_vertices_numba(birth, shape):
 
 
 @njit(parallel=True, fastmath=True)
-def _neighbors(v, shape):
+def _neighbors(v, shape, dual=False):
     n,m = shape
-    nbs = [
-        -1 if v%m == 0 else v-1,
-        -1 if v%m == m-1 else v+1,
-        -1 if v < m-1 else v-m,
-        -1 if v > (n-1)*m - 1 else v+m
-    ]
+    if not dual:
+        nbs = [
+            -1 if v%m == 0 else v-1,
+            -1 if v%m == m-1 else v+1,
+            -1 if v < m-1 else v-m,
+            -1 if v > (n-1)*m - 1 else v+m,
+        ]
+    else:
+        nbs = [
+            n*m if v%m == 0 else v-1,
+            n*m if v%m == m-1 else v+1,
+            n*m if v < m-1 else v-m,
+            n*m if v > (n-1)*m - 1 else v+m,
+            -1 if (v < m-1 or v%m == 0)  else v-m-1,
+            -1 if (v < m-1 or v%m == m-1)  else v-m+1,
+            -1 if (v > (n-1)*m or v%m == 0)  else v+m-1,
+            -1 if (v > (n-1)*m or v%m == m-1)  else v+m+1  
+        ]
+        
+
     return nbs

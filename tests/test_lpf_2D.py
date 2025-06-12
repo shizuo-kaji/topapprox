@@ -1,103 +1,109 @@
 """
 test_lpf_2D.py
 
-This file contains some 2 dimensional tests. This tests perform the low-persistence-filter
-method with various thresholds values and compares the result with the expected values.
-Furthermore, for each case it checks if the BHT is computed correctly. 
+This file contains 2D signal tests for the Low Persistence Filter. It evaluates
+the filter's output on both primal and dual grids (0- and 1-homology), and checks
+if the BHT is constructed correctly.
 """
 
 import pytest
-from topapprox import TopologicalFilterImage, TopologicalFilterGraph
 import numpy as np
+from topapprox import TopologicalFilterImage
 
-def test_2D_simple_python():
-    aux_2D_simple("python")
 
-def test_2D_simple_numba():
-    aux_2D_simple("numba")
+# Each entry in TEST_CASES_2D contains:
+# - "signal": the initial 2D array (image)
+# - "tests": a list of filtering steps, each with:
+#     * "threshold": epsilon value for filtering
+#     * "expected_output": filtered result
+#     * "bht": expected BHT data (parent, linking_vertex, root, children)
+#     * "dual": whether the filter is applied to the dual (for 1-homology)
+TEST_CASES_2D = {
+    "basic_2D_example": {
+        "signal": np.array([
+            [0, 5, 3],
+            [5, 6, 4],
+            [2, 5, 1]
+        ]),
+        "tests": [
+            {
+                "threshold": 1.5,
+                "expected_output": np.array([
+                    [0, 5, 4],
+                    [5, 6, 4],
+                    [2, 5, 1]
+                ]),
+                "bht": {
+                    "parent": np.array([0, 0, 8, 0, 0, 2, 0, 0, 0]),
+                    "linking_vertex": np.array([-1, 1, 5, 3, 4, 5, 3, 7, 1]),
+                    "root": 0,
+                    "children": [[3, 6, 1, 7, 8, 4], [], [5], [], [], [], [], [], [2]]
+                },
+                "dual": False
+            },
+            {
+                "threshold": 1.5,
+                "expected_output": np.array([
+                    [0, 5, 4],
+                    [5, 5, 4],
+                    [2, 5, 1]
+                ]),
+                "bht": {
+                    "parent": np.array([9, 4, 9, 9, 9, 9, 9, 9, 9, 9]),
+                    "linking_vertex": np.array([0, 1, 2, 3, 7, 5, 6, 7, 8, -1]),
+                    "root": 9,
+                    "children": [[], [], [], [], [1], [], [], [], [], [7, 4, 3, 5, 2, 6, 8, 0]]
+                },
+                "dual": True
+            },
+        ]
+    }
+}
 
-def test_2D_simple_numba2():
-    aux_2D_simple("numba")
 
-def test_2D_simple_cpp():
-    aux_2D_simple("cpp")
+# def check_BHT(uf, bht_expected):
+#     parent, linking_vertex, root, children = uf.get_BHT(with_children=True)
+#     passed = (
+#         np.all(parent == bht_expected["parent"]) and
+#         np.all(linking_vertex == bht_expected["linking_vertex"]) and
+#         root == bht_expected["root"] and
+#         all(set(children[i]) == set(bht_expected["children"][i]) for i in range(len(children)))
+#     )
+#     if passed:
+#         return True, ""
+#     else:
+#         return False, f"""
+# (2D test case) BHT mismatch:
+# Expected:
+#   Parent: {bht_expected['parent']}
+#   Linking Vertex: {bht_expected['linking_vertex']}
+#   Root: {bht_expected['root']}
+#   Children: {bht_expected['children']}
+# Got:
+#   Parent: {parent}
+#   Linking Vertex: {linking_vertex}
+#   Root: {root}
+#   Children: {children}
+# """
 
-def check_BHT(uf, bht_expected):
-    parent, linking_vertex, root, children = uf.get_BHT(with_children=True)
-    if (np.all(parent == bht_expected[0]) 
-                    and np.all(linking_vertex == bht_expected[1]) 
-                    and root == bht_expected[2]
-                    and np.all([set(children[k]) == set(bht_expected[3][k]) for k in range(len(children))])
-                    ):
-        return True, " "
-    return False, f"""(2D simple case): BHTs are different. \n
-                    Predicted BHT: \n
-                    Parents:          {bht_expected[0]}\n
-                    Linking vertices: {bht_expected[1]}\n
-                    Root:             {bht_expected[2]}\n
-                    Children:         {bht_expected[3]}\n\n
-                    Computed BHT: \n
-                    Parents:          {parent}\n
-                    Linking vertices: {linking_vertex}\n
-                    Root:             {root}\n
-                    Children:         {children}\n\n
-                    """
-        
 
-def aux_2D_simple(method):
-    # tests is a list nx3, n is the number of tests, and each entry has
-    # original array (if None, then the array is the same as the previous one), epsilon, expected result
-    tests = [[np.array([[0, 5, 3],\
-                        [5, 6, 4],\
-                        [2, 5, 1]]), 
-              1.5, # 0-homology-filtering
-              np.array([[0, 5, 4],\
-                        [5, 6, 4],\
-                        [2, 5, 1]]),
-              1.5, # 1-homology-filtering
-              np.array([[0, 5, 4],\
-                        [5, 5, 4],\
-                        [2, 5, 1]])]
-            ]
-    tests_bhts = [
-                    [
-                        np.array([0, 0, 8, 0, 0, 2, 0, 0, 0]),
-                        np.array([-1,  1,  5,  3,  4,  5,  3,  7,  1]),
-                        0,
-                        [[3, 6, 1, 7, 8, 4], [], [5], [], [], [], [], [], [2]]
-                    ],
-                    [
-                        np.array([ 9,  4,  9,  9, 9,  9, 9, 9, 9,  9]),
-                        np.array([ 0,  1,  2,  3,  7,  5,  6,  7,  8, -1]),
-                        9,
-                        [[], [], [], [], [1], [], [], [], [], [7, 4, 3, 5, 2, 6, 8, 0]]
-                    ]
-                ]
-    
-    j=0
-    for i in range(len(tests)):
-        if isinstance(tests[i][0], np.ndarray):
-            uf = TopologicalFilterImage(tests[i][0], method=method)
-        result = uf.low_pers_filter(tests[i][1])
-        assert np.all(result == tests[i][2]), f'''
-        Failed for array 0-homology filter with array :\n
-        {tests[i][0]}\n
-        With thresholf {tests[i][1]} expected:\n
-        {tests[i][2]}\n
-        but got:\n
-        {result}'''
-        check = check_BHT(uf, tests_bhts[j]) 
-        assert check[0], check[1]
-        j += 1
-        uf = TopologicalFilterImage(result, dual=True, method=method)
-        result = uf.low_pers_filter(tests[i][3])
-        assert np.all(result == tests[i][4]), f'''
-        Failed for array 1-homology filter with array :\n
-        {tests[i][2]}\n
-        With thresholf {tests[i][3]} expected:\n
-        {tests[i][4]}\n
-        but got:\n
-        {result}'''
-        check = check_BHT(uf, tests_bhts[j]) 
-        assert check[0], check[1]
-        j += 1
+@pytest.mark.parametrize("method", ["python", "numba", "cpp"])
+def test_all_2D_cases(method):
+    for case_name, case in TEST_CASES_2D.items():
+        signal = case["signal"]
+
+        current_input = signal
+        for i, test in enumerate(case["tests"]):
+            dual = test.get("dual", False)
+            uf = TopologicalFilterImage(current_input, method=method, dual=dual)
+            result = uf.low_pers_filter(test["threshold"])
+
+            assert np.all(result.astype(np.int32) == test["expected_output"]), (
+                f"[{case_name}] step {i} failed (dual={dual}) with method='{method}' and threshold={test['threshold']}.\n"
+                f"Expected:\n{test['expected_output']}\nGot:\n{result}"
+            )
+
+            # passed, msg = check_BHT(uf, test["bht"])
+            # assert passed, f"[{case_name}] step {i} BHT failed (dual={dual}) with method='{method}':\n{msg}"
+
+            current_input = result

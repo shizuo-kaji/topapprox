@@ -1,4 +1,155 @@
 
+2025-06-12, at 10:15:08
+test_compare_cripser_3D took 0.3373 seconds
+test_all_1D_cases[python] took 0.0008 seconds
+test_all_1D_cases[numba] took 1.6344 seconds
+test_all_1D_cases[cpp] took 0.0003 seconds
+test_all_2D_cases[python] took 0.0003 seconds
+test_all_2D_cases[numba] took 0.6506 seconds
+test_all_2D_cases[cpp] took 0.0002 seconds
+test_pagoda took 4.9821 seconds
+
+2025-06-12, at 10:12:54
+test_compare_cripser_3D took 0.3251 seconds
+
+2025-06-12, at 10:12:06
+test_pagoda took 6.6720 seconds
+
+2025-06-12, at 10:12:02
+
+
+2025-06-12, at 10:10:07
+
+
+2025-06-12, at 10:05:25
+test_pagoda took 6.6723 seconds
+
+2025-06-12, at 10:04:17
+test_pagoda took 9.4390 seconds
+
+2025-06-12, at 10:03:42
+test_all_2D_cases[python] took 0.0015 seconds
+test_all_2D_cases[numba] took 2.3090 seconds
+test_all_2D_cases[cpp] took 0.0015 seconds
+
+2025-06-12, at 10:03:22
+test_all_2D_cases[python] took 0.0157 seconds
+test_all_2D_cases[numba] took 0.0010 seconds
+test_all_2D_cases[cpp] took 0.0023 seconds
+
+2025-06-12, at 10:01:17
+test_all_2D_cases[python] took 0.0007 seconds
+test_all_2D_cases[numba] took 0.7274 seconds
+test_all_2D_cases[cpp] took 0.0035 seconds
+
+2025-06-12, at 09:58:58
+test_all_2D_cases[python] took 0.0015 seconds
+test_all_2D_cases[numba] took 0.7260 seconds
+test_all_2D_cases[cpp] took 0.0034 seconds
+
+2025-06-12, at 09:58:05
+test_all_2D_cases[python] took 0.0252 seconds
+test_all_2D_cases[numba] took 0.0048 seconds
+test_all_2D_cases[cpp] took 0.0055 seconds
+
+2025-06-12, at 09:55:26
+test_all_2D_cases[python] took 0.0007 seconds
+test_all_2D_cases[numba] took 2.1709 seconds
+test_all_2D_cases[cpp] took 0.0250 seconds
+
+2025-06-12, at 09:54:18
+test_all_2D_cases[python] took 0.0009 seconds
+test_all_2D_cases[numba] took 0.5688 seconds
+test_all_2D_cases[cpp] took 0.0035 seconds
+
+2025-06-12, at 09:47:41
+test_all_2D_cases[python] took 0.0009 seconds
+test_all_2D_cases[numba] took 2.1809 seconds
+test_all_2D_cases[cpp] took 0.0038 seconds
+
+2025-06-12, at 09:46:41
+test_all_2D_cases[python] took 0.0009 seconds
+test_all_2D_cases[numba] took 2.3490 seconds
+test_all_2D_cases[cpp] took 0.0035 seconds
+
+2025-06-12, at 09:42:46
+test_all_2D_cases[python] took 0.0009 seconds
+test_all_2D_cases[numba] took 2.2407 seconds
+test_all_2D_cases[cpp] took 0.0015 seconds
+
+2025-06-12, at 09:37:56
+test_all_2D_cases[python] took 0.0007 seconds
+test_all_2D_cases[numba] took 2.1320 seconds
+test_all_2D_cases[cpp] took 0.0015 seconds
+
+2025-06-12, at 09:37:12
+test_all_2D_cases[python] took 0.0008 seconds
+test_all_2D_cases[numba] took 2.1439 seconds
+test_all_2D_cases[cpp] took 0.0014 seconds
+
+2025-06-12, at 09:34:42
+test_all_2D_cases[python] took 0.0008 seconds
+test_all_2D_cases[numba] took 0.5462 seconds
+test_all_2D_cases[cpp] took 0.0016 seconds
+
+2025-06-12, at 09:31:16
+test_all_2D_cases[python] took 0.0009 seconds
+test_all_2D_cases[numba] took 0.6674 seconds
+test_all_2D_cases[cpp] took 0.0015 seconds
+
+2025-06-12, at 09:20:23
+test_all_2D_cases[python] took 0.0008 seconds
+test_all_2D_cases[numba] took 1.9966 seconds
+test_all_2D_cases[cpp] took 0.0015 seconds
+
+2025-06-12, at 09:19:29
+test_all_2D_cases[python] took 0.0284 seconds
+test_all_2D_cases[numba] took 1.4837 seconds
+test_all_2D_cases[cpp] took 0.0023 seconds
+
+2025-06-12, at 09:16:26
+test_all_2D_cases[python] took 0.0340 seconds
+test_all_2D_cases[numba] took 2.0943 seconds
+test_all_2D_cases[cpp] took 0.0025 seconds
+
+2025-06-12, at 09:14:09
+test_2D_simple_python took 0.0324 seconds
+test_2D_simple_numba took 2.0548 seconds
+test_2D_simple_numba2 took 0.0023 seconds
+test_2D_simple_cpp took 0.0030 seconds
+
+2025-06-12, at 09:10:40
+test_all_1D_cases[python] took 0.0008 seconds
+test_all_1D_cases[numba] took 1.3314 seconds
+test_all_1D_cases[cpp] took 0.0016 seconds
+
+2025-06-12, at 09:09:14
+test_all_1D_cases[python] took 0.0010 seconds
+test_all_1D_cases[numba] took 1.5341 seconds
+test_all_1D_cases[cpp] took 0.0015 seconds
+
+2025-06-12, at 09:04:59
+test_all_1D_cases[python] took 0.0252 seconds
+test_all_1D_cases[numba] took 2.4427 seconds
+test_all_1D_cases[cpp] took 0.0039 seconds
+
+2025-06-12, at 08:51:53
+test_all_1D_cases[python] took 0.0009 seconds
+test_all_1D_cases[numba] took 0.2078 seconds
+test_all_1D_cases[cpp] took 0.0013 seconds
+
+2025-06-12, at 08:31:30
+test_compare_cripser_3D took 0.3468 seconds
+test_1D_simple_python took 0.0236 seconds
+test_1D_simple_numba took 0.0021 seconds
+test_1D_simple_numba2 took 0.0020 seconds
+test_1D_simple_cpp took 0.0020 seconds
+test_2D_simple_python took 0.0023 seconds
+test_2D_simple_numba took 0.0922 seconds
+test_2D_simple_numba2 took 0.0025 seconds
+test_2D_simple_cpp took 0.0017 seconds
+test_pagoda took 2.9320 seconds
+
 2024-11-01, at 14:17:15
 test_compare_cripser_3D took 0.5099 seconds
 test_1D_simple_python took 0.0260 seconds
