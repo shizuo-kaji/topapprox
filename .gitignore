@@ -134,3 +134,6 @@ dmypy.json
 local_testing.ipynb
 .vscode/
 settings.json
+.benchmarks
+.conda
+benchmarks/
