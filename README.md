@@ -30,7 +30,7 @@ It enables signal denoising and structure-preserving smoothing using techniques 
 ## Documentation & Examples
 
 - 🔗 [Interactive Tutorial](Interactive_Tutorial_topapprox.ipynb)
-- 📝 [Reproducible Examples from Our Paper](https://github.com/mvlier/topapprox/blob/main/Paper%20examples/Reproducing_paper_examples.ipynb)
+- 📝 [Reproducible Examples from Our Paper](https://github.com/mvlier/topapprox/blob/develop/Interactive%20Tutorial/Interactive_Tutorial_topapprox.ipynb)
 - 📄 [Original Paper on arXiv (2024)](https://arxiv.org/abs/2408.14109)
 
 ---
