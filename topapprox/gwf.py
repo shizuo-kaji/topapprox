@@ -47,6 +47,8 @@ class GraphWithFaces:
         else:
             self._finalize_edges()
 
+        self.n_nodes = len(set([x for edge in self.E for x in edge]))
+
     def __str__(self):
         """
         Returns a human-readable string representation of the object.
@@ -162,3 +164,164 @@ class GraphWithFaces:
 
         self.dualE = np.vstack((np.array(list(self.E), dtype=np.uint32), np.array(list(self.dualE), dtype=np.uint32)))
         self._finalize_edges()
+
+
+
+
+
+    ##############################
+    ##############################
+    # For Drawing ################
+    ##############################
+    ##############################
+
+    def draw(
+        self,
+        signal=None,
+        pos=None,
+        cmap='viridis',
+        figsize=(6, 6),
+        face_alpha=0.4,
+        node_edgecolors='black',
+        colorbar=True,
+        edge_width=2.5,
+        vmin=None,
+        vmax=None,
+        edge_boundary_color=None,
+        linewidth=1.5,
+        threshold=None,
+        ax = None,
+        gray_faces = False          
+    ):
+        """
+        Plot a signal on the vertices, with edge and face colours given by the
+        *maximum* signal on their vertices.
+        If `threshold` is not None, elements with value >= threshold are rendered
+        fully transparent (alpha = 0) but are still created so that aspect, ticks,
+        etc. stay unchanged.
+
+        Parameters
+        ----------
+        threshold : float or None, optional
+            Draw only elements whose value is < threshold.  Others are drawn
+            transparent.  Default None (plot everything normally).
+        <---- rest of the original docstring, unchanged ---->
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        import networkx as nx
+
+        if signal is None:
+            signal = self.signal[:self.n_nodes]  # use only vertex signals
+
+        if ax is None:                       
+            fig, ax = plt.subplots(figsize=figsize)
+        else:                             
+            fig = ax.figure                 
+            ax.clear()
+
+        if len(signal) != self.n_nodes:
+            raise ValueError("Signal length must match number of nodes.")
+
+        # ---------- graph / layouts ----------
+        G = nx.Graph()
+        G.add_edges_from([tuple(e) for e in self.E])
+        if pos is None:
+            pos = nx.spring_layout(G, seed=42)
+
+        # ---------- per-element signals ----------
+        edge_signal = np.array([max(signal[u], signal[v]) for u, v in self.E])
+        face_signal = np.array([max(signal[v] for v in face) for face in self.F])
+        hole_signal = np.array([max(signal[v] for v in hole) for hole in self.H])
+
+        if vmin is None:
+            vmin = min(signal.min(), edge_signal.min(), face_signal.min())
+        if vmax is None:
+            vmax = max(signal.max(), edge_signal.max(), face_signal.max())
+
+        norm = plt.Normalize(vmin=vmin, vmax=vmax)
+        cmap_func = plt.cm.get_cmap(cmap)
+
+        # helper: transparent version of a colour  -------------------------------
+        def transparent(col):
+            r, g, b, _ = mcolors.to_rgba(col)
+            return (r, g, b, 0.0)
+
+
+        edge_color_face = "black" if threshold is None else 'black'
+        # ---------- holes ----------
+        if self.H is not None:
+            for i, hole in enumerate(self.H):
+                polygon = np.array([pos[v] for v in hole])
+                if threshold is not None and hole_signal[i] >= threshold:
+                    edge_color_face = "none"
+                    alpha = 0.0                    # hide completely
+                else:
+                    edge_color_face = "black"
+                    alpha = face_alpha
+                ax.fill(*zip(*polygon), color='none', alpha=alpha,
+                        edgecolor=edge_color_face, linewidth=linewidth)
+
+        
+        # ---------- faces ----------
+        for i, face in enumerate(self.F):
+            polygon = np.array([pos[v] for v in face])
+            col = cmap_func(norm(face_signal[i]))
+            if threshold is not None and face_signal[i] >= threshold:
+                col = transparent(col)
+                alpha = 0.0                    # hide completely
+                edge_color_face = "none"
+            else:
+                alpha = face_alpha
+                edge_color_face = "black"
+            if gray_faces:
+                col = 'lightgray'
+            ax.fill(*zip(*polygon), color=col, alpha=alpha,
+                    edgecolor=edge_color_face, linewidth=linewidth)
+
+        # ---------- edges ----------
+        for i, (u, v) in enumerate(self.E):
+            if edge_boundary_color is not None:
+                col = edge_boundary_color
+            else:
+                col = cmap_func(norm(edge_signal[i]))
+
+            if threshold is not None and edge_signal[i] >= threshold:
+                col = transparent(col)
+
+            ax.plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]],
+                    color=col, linewidth=edge_width, solid_capstyle='round')
+
+        # ---------- nodes ----------
+        node_face_colors = []
+        node_edge_colors = []
+
+        for val in signal:
+            base_rgba = cmap_func(norm(val))
+
+            if threshold is not None and val >= threshold:
+                # vertex is “masked”: completely transparent face, outline transparent
+                node_face_colors.append(transparent(base_rgba))
+                node_edge_colors.append(transparent('black'))     # or transparent(base_rgba) if you prefer
+            else:
+                # vertex is shown: normal face colour, but *transparent* outline
+                node_face_colors.append(base_rgba)
+                node_edge_colors.append(node_edgecolors)  # invisible contour
+
+        node_xy = np.array([pos[i] for i in range(self.n_nodes)])
+        ax.scatter(node_xy[:, 0], node_xy[:, 1],
+                c=node_face_colors,
+                edgecolors=node_edge_colors,
+                s=200, vmin=vmin, vmax=vmax, zorder=10)
+
+        # ---------- colour-bar ----------
+        if colorbar:
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array(signal)
+            plt.colorbar(sm, ax=ax, orientation='vertical',
+                        fraction=0.03, pad=0.02, shrink=0.6)
+
+        ax.set_aspect('equal')
+        ax.axis('off')
+        
+        return fig, ax

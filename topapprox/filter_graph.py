@@ -36,7 +36,7 @@ from .bht import BasinHierarchyTree
 
 #Class for graph input
 class TopologicalFilterGraph(MethodLoaderMixin):
-  def __init__(self, input=None, method="cpp", bht_method="python", dual=False, recursive=True, is_triangulated=False):
+  def __init__(self, input=None, method="cpp", bht_method="python", dual=False, recursive=True, is_triangulated=False, gwf=None):
     self.recursive = recursive
     self.dual = dual
     self.method = self.load_link_reduce(method, __package__) # python, numba or C++
@@ -50,7 +50,7 @@ class TopologicalFilterGraph(MethodLoaderMixin):
     self.persistent_children = None
     self.parent = None
     self.shape = None
-    self.gwf = None
+    self.gwf = gwf
     self.is_triangulated = is_triangulated
     self.compute = "dual" if self.dual else "normal"
     if isinstance(input,np.ndarray):
@@ -235,129 +235,129 @@ class TopologicalFilterGraph(MethodLoaderMixin):
   #######################################################################################
   #######################################################################################
 
-  def reorient(self):
-    k=0
-    List=list(range(len(self.faces)-1))
-    self.faces = [list(f) for f in self.faces]
-    while List:
-      for j in List:
-        interP=[x for x in self.faces[k] if x in self.faces[j]]
-        if len(interP)>1:
-          index_P0= self.faces[j].index(interP[0])
-          # Determine the next index, or wrap around to the first index if P0 is the last element
-          next_index = (index_P0 + 1) % len(self.faces[j])
-          # Get the number next to 2
-          next_number = self.faces[j][next_index]
-          if next_number==interP[1]:
-            self.faces[j+1].reverse()
-        k=j
-        List.remove(j)
-        break
+  # def reorient(self):
+  #   k=0
+  #   List=list(range(len(self.faces)-1))
+  #   self.faces = [list(f) for f in self.faces]
+  #   while List:
+  #     for j in List:
+  #       interP=[x for x in self.faces[k] if x in self.faces[j]]
+  #       if len(interP)>1:
+  #         index_P0= self.faces[j].index(interP[0])
+  #         # Determine the next index, or wrap around to the first index if P0 is the last element
+  #         next_index = (index_P0 + 1) % len(self.faces[j])
+  #         # Get the number next to 2
+  #         next_number = self.faces[j][next_index]
+  #         if next_number==interP[1]:
+  #           self.faces[j+1].reverse()
+  #       k=j
+  #       List.remove(j)
+  #       break
 
 
-  def pos_from_faces(self): ## still buggy
-    self.reorient()
-    PE = nx.PlanarEmbedding()
-    for node in self.boundary:
-      faces = [face for face in self.faces if node in face]
+  # def pos_from_faces(self): ## still buggy
+  #   self.reorient()
+  #   PE = nx.PlanarEmbedding()
+  #   for node in self.boundary:
+  #     faces = [face for face in self.faces if node in face]
 
-      #Getting a neighbour (nb1) of node, which only shares one face with node
-      numb_of_faces = {u: len([x for x in faces if u in x]) for u in self.G.neighbors(node)}
-      nb1 = [x for x, v in numb_of_faces.items() if v==1][0]
+  #     #Getting a neighbour (nb1) of node, which only shares one face with node
+  #     numb_of_faces = {u: len([x for x in faces if u in x]) for u in self.G.neighbors(node)}
+  #     nb1 = [x for x, v in numb_of_faces.items() if v==1][0]
 
-      face = [f for f in faces if nb1 in f][0]
-      idx = face.index(node)
-      if nb1 == face[idx-1]:
-        add_edge = PE.add_half_edge_cw
-        next_nbh = lambda f : f[idx-len(f)+1]
-      else :
-        add_edge = PE.add_half_edge_ccw
-        next_nbh = lambda f : f[idx-1]
-      nb2 = next_nbh(face)
-      add_edge(node,nb1,None)
-      add_edge(node,nb2,nb1)
-      faces.pop(faces.index(face))
-      while len(faces)>0:
-        face = [f for f in faces if nb2 in f]
-        if len(face)>0:
-          face = face[0]
-          nb1 = nb2
-          idx = face.index(node)
-          nb2 = next_nbh(face)
-          add_edge(node,nb2,nb1)
-          faces.pop(faces.index(face))
-        else:
-          break
+  #     face = [f for f in faces if nb1 in f][0]
+  #     idx = face.index(node)
+  #     if nb1 == face[idx-1]:
+  #       add_edge = PE.add_half_edge_cw
+  #       next_nbh = lambda f : f[idx-len(f)+1]
+  #     else :
+  #       add_edge = PE.add_half_edge_ccw
+  #       next_nbh = lambda f : f[idx-1]
+  #     nb2 = next_nbh(face)
+  #     add_edge(node,nb1,None)
+  #     add_edge(node,nb2,nb1)
+  #     faces.pop(faces.index(face))
+  #     while len(faces)>0:
+  #       face = [f for f in faces if nb2 in f]
+  #       if len(face)>0:
+  #         face = face[0]
+  #         nb1 = nb2
+  #         idx = face.index(node)
+  #         nb2 = next_nbh(face)
+  #         add_edge(node,nb2,nb1)
+  #         faces.pop(faces.index(face))
+  #       else:
+  #         break
 
-    internal_nodes = set(self.G.nodes) - set(self.boundary)
+  #   internal_nodes = set(self.G.nodes) - set(self.boundary)
 
-    for node in internal_nodes:
-      add_edge = PE.add_half_edge_cw
-      faces = [face for face in self.faces if node in face]
-      face = faces[-1]
-      idx = face.index(node)
-      nb1 = face[idx-1]
-      nb2 = face[idx-len(face)+1]
-      add_edge(node, nb1, None)
-      add_edge(node, nb2, nb1)
-      faces.pop()
-      while len(faces) > 1:
-        face = [f for f in faces if nb2 in f]
-        if len(face)>0:
-          face = face[0]
-          idx = face.index(node)
-          nb1 = nb2
-          nb2 = face[idx-len(face)+1]
-          add_edge(node, nb2, nb1)
-          faces.pop(faces.index(face))
-        else:
-          break
-    try:
-      PE.check_structure()
-      pos = nx.combinatorial_embedding_to_pos(PE)
-    except:
-      print("NOT GOOD")
-      return(None)
-    return(pos)  
+  #   for node in internal_nodes:
+  #     add_edge = PE.add_half_edge_cw
+  #     faces = [face for face in self.faces if node in face]
+  #     face = faces[-1]
+  #     idx = face.index(node)
+  #     nb1 = face[idx-1]
+  #     nb2 = face[idx-len(face)+1]
+  #     add_edge(node, nb1, None)
+  #     add_edge(node, nb2, nb1)
+  #     faces.pop()
+  #     while len(faces) > 1:
+  #       face = [f for f in faces if nb2 in f]
+  #       if len(face)>0:
+  #         face = face[0]
+  #         idx = face.index(node)
+  #         nb1 = nb2
+  #         nb2 = face[idx-len(face)+1]
+  #         add_edge(node, nb2, nb1)
+  #         faces.pop(faces.index(face))
+  #       else:
+  #         break
+  #   try:
+  #     PE.check_structure()
+  #     pos = nx.combinatorial_embedding_to_pos(PE)
+  #   except:
+  #     print("NOT GOOD")
+  #     return(None)
+  #   return(pos)  
     
-  def draw(self, *, with_filtration=False, with_labels=False, modified=False, ax=None, node_size=600, font_size=8):
-    if self.G is None:
-      self.G = nx.Graph()
-      self.G.add_edges_from(self.E)
-    if self.pos == None:
-      self.pos = self.pos_from_faces()
-    #Drawing
-    if ax == None:
-      if with_labels:
-        if modified:
-          mf = self.get_modified_filtration()
-          nx.draw(self.G, self.pos, labels={u:f'V{u} : {mf[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
-        elif with_filtration:
-          nx.draw(self.G, self.pos, labels={u:f'V{u} : {self.filtration[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
-        else:
-          nx.draw(self.G, self.pos, labels = {u:f'V{u}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
-      else:
-        if modified:
-          mf = self.get_modified_filtration()
-          nx.draw(self.G, self.pos, labels={u:mf[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
-        elif with_filtration:
-          nx.draw(self.G, self.pos, labels={u:self.filtration[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
-        else:
-          nx.draw(self.G, self.pos, with_labels = False, node_size=node_size, font_size=font_size)
-    else:
-      if with_labels:
-        if modified:
-          mf = self.get_modified_filtration()
-          nx.draw(self.G, self.pos, labels={u:f'V{u} : {mf[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
-        elif with_filtration:
-          nx.draw(self.G, self.pos, labels={u:f'V{u} : {self.filtration[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
-        else:
-          nx.draw(self.G, self.pos, labels = {u:f'V{u}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
-      else:
-        if modified:
-          mf = self.get_modified_filtration()
-          nx.draw(self.G, self.pos, labels={u:mf[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
-        elif with_filtration:
-          nx.draw(self.G, self.pos, labels={u:self.filtration[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
-        else:
-          nx.draw(self.G, self.pos, with_labels = False, node_size=node_size, font_size=font_size, ax=ax)
+  # def draw(self, *, with_filtration=False, with_labels=False, modified=False, ax=None, node_size=600, font_size=8):
+  #   if self.G is None:
+  #     self.G = nx.Graph()
+  #     self.G.add_edges_from(self.E)
+  #   if self.pos == None:
+  #     self.pos = self.pos_from_faces()
+  #   #Drawing
+  #   if ax == None:
+  #     if with_labels:
+  #       if modified:
+  #         mf = self.get_modified_filtration()
+  #         nx.draw(self.G, self.pos, labels={u:f'V{u} : {mf[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
+  #       elif with_filtration:
+  #         nx.draw(self.G, self.pos, labels={u:f'V{u} : {self.filtration[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
+  #       else:
+  #         nx.draw(self.G, self.pos, labels = {u:f'V{u}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
+  #     else:
+  #       if modified:
+  #         mf = self.get_modified_filtration()
+  #         nx.draw(self.G, self.pos, labels={u:mf[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
+  #       elif with_filtration:
+  #         nx.draw(self.G, self.pos, labels={u:self.filtration[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size)
+  #       else:
+  #         nx.draw(self.G, self.pos, with_labels = False, node_size=node_size, font_size=font_size)
+  #   else:
+  #     if with_labels:
+  #       if modified:
+  #         mf = self.get_modified_filtration()
+  #         nx.draw(self.G, self.pos, labels={u:f'V{u} : {mf[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
+  #       elif with_filtration:
+  #         nx.draw(self.G, self.pos, labels={u:f'V{u} : {self.filtration[u]}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
+  #       else:
+  #         nx.draw(self.G, self.pos, labels = {u:f'V{u}' for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
+  #     else:
+  #       if modified:
+  #         mf = self.get_modified_filtration()
+  #         nx.draw(self.G, self.pos, labels={u:mf[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
+  #       elif with_filtration:
+  #         nx.draw(self.G, self.pos, labels={u:self.filtration[u] for u in self.G.nodes()}, with_labels = True, node_size=node_size, font_size=font_size, ax=ax)
+  #       else:
+  #         nx.draw(self.G, self.pos, with_labels = False, node_size=node_size, font_size=font_size, ax=ax)
