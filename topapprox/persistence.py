@@ -2,9 +2,11 @@
 and related quantities
 """
 
+import numpy as np
+
 from .filter_graph import TopologicalFilterGraph
 
-def get_PD_gwf(F, H, signal, E=None):
+def get_PD_gwf(F, H, signal, E=None, *, method="cpp", bht_method="python", is_triangulated=False):
     """ Computes the 0 and 1 dimensional persistence diagram
     of a graph with faces. The graph with faces is determined
     byt the set of faces `F`, set of holes `H`, and optional
@@ -13,22 +15,12 @@ def get_PD_gwf(F, H, signal, E=None):
     filtration.
     """
 
-    # 0-homology
-    tfg0 = TopologicalFilterGraph()
-    tfg0.compute_gwf(F=F, H=H, E=E, signal=signal)
-    _ = tfg0.low_pers_filter(epsilon=0)
-    pd0 = tfg0.bht.get_persistence(reduced=False)
-    if len(pd0.shape) > 1:
-        pd0 = pd0[:, :2]
-
-    # 1-homology
-    tfg1 = TopologicalFilterGraph(dual=True)
-    tfg1.compute_gwf(F=F, H=H, E=E, signal=signal)
-    _ = tfg1.low_pers_filter(epsilon=0)
-    pd1 = tfg1.bht.get_persistence()
-    if len(pd1.shape) > 1:
-        pd1 = pd1[:, :2]
-    else:
-        return [pd0]
-
-    return [pd0, pd1]
+    tfg = TopologicalFilterGraph(
+        method=method,
+        bht_method=bht_method,
+        dual=False,
+        is_triangulated=is_triangulated,
+    )
+    tfg.compute_gwf(F=F, H=H, E=E, signal=np.asarray(signal))
+    pd0, pd1 = tfg.get_diagram()
+    return [np.asarray(pd0), np.asarray(pd1)]

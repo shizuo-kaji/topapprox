@@ -19,8 +19,12 @@ class MethodLoaderMixin:
                     self._link_reduce = getattr(module, '_link_reduce_cpp')
                 # self.compute_descendants = getattr(module, 'compute_descendants_cpp')
             except Exception as e:
-                warnings.warn(e + """\n Falling back to python (slower) since C++ version could not be loaded\n
-                              For using numba version one can set method='numba'""", UserWarning)
+                warnings.warn(
+                    f"{e}\nFalling back to python (slower) since C++ version "
+                    "could not be loaded.\nFor using numba version one can set "
+                    "method='numba'.",
+                    UserWarning,
+                )
                 method = "python"
         elif method == "numba":
             try:
@@ -31,8 +35,12 @@ class MethodLoaderMixin:
                     self._link_reduce = getattr(module, 'link_reduce_wrapper')
                 # self.compute_descendants = getattr(module, 'compute_descendants_numba')
             except Exception as e:
-                warnings.warn(e + """\n Falling back to python since numba version could not be loaded\n
-                              For using C++ version (recommended for performance) one can set method='cpp'""", UserWarning)
+                warnings.warn(
+                    f"{e}\nFalling back to python since numba version could not be "
+                    "loaded.\nFor using C++ version (recommended for performance) "
+                    "one can set method='cpp'.",
+                    UserWarning,
+                )
                 method = "python"
         elif method != "python":
             raise ValueError(f"Unknown method: {method}")
@@ -55,7 +63,11 @@ class MethodLoaderMixin:
                 module = importlib.import_module('.bht_cpp', package=package)
                 self.BHT_Class = getattr(module, 'BasinHierarchyTree')
             except Exception as e:
-                warnings.warn(e + """\n Falling back to python (slower) since C++ version could not be loaded\n""", UserWarning)
+                warnings.warn(
+                    f"{e}\nFalling back to python (slower) since C++ version "
+                    "could not be loaded.",
+                    UserWarning,
+                )
                 method = "python"
         if method == "python":
             module = importlib.import_module('.bht', package=package)

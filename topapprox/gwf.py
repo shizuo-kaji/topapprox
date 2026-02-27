@@ -27,16 +27,22 @@ class GraphWithFaces:
     """
     
     def __init__(self, F=None, H=None, E=None, signal=None, compute="normal", is_triangulated=False):
-        self.F = F 
-        self.H = H
+        if signal is None:
+            raise ValueError("signal must be provided.")
+        if compute not in {"normal", "dual", "both"}:
+            raise ValueError(f"compute must be 'normal', 'dual', or 'both', got: {compute}")
+
+        self.F = [] if F is None else F
+        self.H = [] if H is None else H
         self.E = E
-        self.signal = signal
+        self.signal = np.asarray(signal)
         self.E_signal = None
         self.dualE = set()
         self.dualE_signal = None
         self.compute = compute
         self.is_triangulated = is_triangulated
-        self.vertex_count = signal.shape[0]
+        self.n_nodes = int(self.signal.shape[0])
+        self.vertex_count = self.n_nodes
         self._extend_signal()
 
         if self.E is None:
@@ -47,7 +53,19 @@ class GraphWithFaces:
         else:
             self._finalize_edges()
 
-        self.n_nodes = len(set([x for edge in self.E for x in edge]))
+    @staticmethod
+    def _edge_array(edge_set):
+        if isinstance(edge_set, np.ndarray):
+            edges = np.asarray(edge_set, dtype=np.uint32)
+            if edges.size == 0:
+                return edges.reshape(0, 2)
+            if edges.ndim != 2 or edges.shape[1] != 2:
+                raise ValueError("Expected edge array of shape (n, 2).")
+            return edges
+        edges = np.array(list(edge_set), dtype=np.uint32)
+        if edges.size == 0:
+            return np.empty((0, 2), dtype=np.uint32)
+        return edges
 
     def __str__(self):
         """
@@ -77,9 +95,9 @@ class GraphWithFaces:
         """
         if self.is_triangulated:
             self.signal = np.concatenate((self.signal, np.full(len(self.H), np.inf)))
-        else:
-            maxF = [max([self.signal[v] for v in f]) for f in self.F]
-            self.signal = np.concatenate((self.signal, np.array(maxF), np.full(len(self.H), np.inf)))
+            return
+        maxF = np.array([np.max(self.signal[np.asarray(f, dtype=np.int64)]) for f in self.F], dtype=self.signal.dtype)
+        self.signal = np.concatenate((self.signal, maxF, np.full(len(self.H), np.inf)))
 
     def _finalize_edges(self):
         """
@@ -87,7 +105,9 @@ class GraphWithFaces:
         Also stores edge signal arrays used for downstream filtering.
         """
         def sort_edges(edge_set, negate=False):
-            edges = np.array(list(edge_set), dtype=np.uint32)
+            edges = self._edge_array(edge_set)
+            if edges.shape[0] == 0:
+                return edges, np.array([], dtype=self.signal.dtype)
             values = self.signal if not negate else -self.signal
             edge_signals = np.maximum(values[edges[:, 0]], values[edges[:, 1]])
             sorted_idx = np.argsort(edge_signals)
@@ -162,7 +182,14 @@ class GraphWithFaces:
         for hole in self.H:
             connect_dual_vertex(hole)
 
-        self.dualE = np.vstack((np.array(list(self.E), dtype=np.uint32), np.array(list(self.dualE), dtype=np.uint32)))
+        primal_edges = self._edge_array(self.E)
+        dual_extra = self._edge_array(self.dualE)
+        if primal_edges.shape[0] == 0:
+            self.dualE = dual_extra
+        elif dual_extra.shape[0] == 0:
+            self.dualE = primal_edges
+        else:
+            self.dualE = np.vstack((primal_edges, dual_extra))
         self._finalize_edges()
 
 

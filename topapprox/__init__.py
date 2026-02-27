@@ -1,8 +1,17 @@
-from .filter_image import *
-from .filter_graph import *
-from .tools import *
+from .filter_graph import TopologicalFilterGraph
+from .filter_image import TopologicalFilterImage
+from .gwf import GraphWithFaces
+from .persistence_filter import Filtered, PersistenceFilter
+from .tools import tools
 
-__all__ = ["TopologicalFilterImage","TopologicalFilterImage"]
+__all__ = [
+    "TopologicalFilterImage",
+    "TopologicalFilterGraph",
+    "GraphWithFaces",
+    "PersistenceFilter",
+    "Filtered",
+    "tools",
+]
 
 try:
     from importlib.metadata import version, PackageNotFoundError

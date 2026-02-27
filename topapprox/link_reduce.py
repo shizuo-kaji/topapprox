@@ -8,7 +8,7 @@ import numpy as np
 
 def _link_reduce(birth, edges, epsilon, keep_basin=False):
     """Link and reduce function without Numba."""
-    
+
     #persistence = [(birth.min(), np.inf, birth.argmin())]
     parent = np.arange(birth.shape[0])
     ancestor = np.arange(birth.shape[0])
@@ -46,12 +46,12 @@ def _link_reduce(birth, edges, epsilon, keep_basin=False):
             if birth[up] < death:  # A cycle is produced
                 persistent_children[vp].append(up)
                 positive_pers.append(up)
-                
+
                 # if death - birth[up] < epsilon:
                 #     desc = compute_descendants(up, children)
 
                 #     # Update modified for each descendant
-                #     for index in range(len(desc)): 
+                #     for index in range(len(desc)):
                 #         modified[desc[index]] = death
 
     return parent, children, root, linking_vertex, persistent_children, np.array(positive_pers)
@@ -68,28 +68,28 @@ def _link_reduce_vertices(birth:np.ndarray, shape:tuple, dual:bool):
     n, m = shape
     size = n * m + 1 if dual else n * m
     #neighbors = np.empty(8 if dual else 4, dtype=np.uint32)
-    
+
     # Precompute sorted order and birth index
     vertices_ordered = np.argsort(birth)
     idx = np.unravel_index(vertices_ordered[1:], (n,m))
     # vertex_birth_index = np.empty_like(vertices_ordered)
     # vertex_birth_index[vertices_ordered] = np.arange(len(vertices_ordered))
-    
+
     parent = np.arange(size)
     ancestor = np.arange(size)
     linking_vertex = np.full(size, -1)
     root = [0]
     positive_pers = []
-    
+
     children = [[] for _ in range(size)]
     persistent_children = [[] for _ in range(size)]
-    
+
     for i, v in enumerate(vertices_ordered[1:]):
         #_neighbors(v, (n, m), neighbors, dual)
-        check_and_link(v, idx[0][i], idx[1][i], n, m, dual, birth, 
-                       children, parent, ancestor, root, 
+        check_and_link(v, idx[0][i], idx[1][i], n, m, dual, birth,
+                       children, parent, ancestor, root,
                        linking_vertex, persistent_children, positive_pers)
-        
+
 
     return parent, children, root[0], linking_vertex, persistent_children, np.array(positive_pers)
 
@@ -140,25 +140,3 @@ def _link_update(v, u, birth, children, parent, ancestor, root, linking_vertex, 
             if birth[up] < birth[v]:
                 persistent_children[vp].append(up)
                 positive_pers.append(up)
-
-
-# def _neighbors(v:int, shape:tuple, nbs:np.ndarray, dual:bool):
-#     n, m = shape
-#     left, right = v % m == 0, v % m == m - 1
-#     top, bottom = v < m, v >= (n - 1) * m
-
-#     nbs[:4] = (
-#         n*m+1 if left else v-1,
-#         n*m+1 if right else v+1,
-#         n*m+1 if top else v-m,
-#         n*m+1 if bottom else v+m
-#     )
-    
-#     if dual:
-#         nbs[4:] = (
-#             n*m if top or left else v-m-1,
-#             n*m if bottom or right else v+m+1,
-#             n*m+1 if top or right else v-m+1,
-#             n*m+1 if bottom or left else v+m-1
-#         )
-

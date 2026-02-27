@@ -81,10 +81,9 @@ class TopologicalFilterImage(MethodLoaderMixin):
             modified = self.bht._low_pers_filter(epsilon)
         else:
             modified = self.bht._lpf_size_filter(epsilon, size_range=size_range)
-        if(self.dual):
+        if self.dual:
             modified = -modified[:-1]
-        modified = modified.reshape(self.shape)
-        return(modified)
+        return modified.reshape(self.shape)
 
         
     def _update_BHT(self):
@@ -137,7 +136,7 @@ class TopologicalFilterImage(MethodLoaderMixin):
                      [(i*m + m-1, n*m) for i in range(1, n-1)]
             
             edges = np.array(edges, dtype=np.uint32)
-            birth_edges = np.maximum(self.bht.birth[edges[:, 0]], self.bht.birth[edges[:, 1]])
+            birth_edges = np.maximum(self.bht_birth[edges[:, 0]], self.bht_birth[edges[:, 1]])
         else:
             edges = np.array(edges, dtype=np.uint32)
             birth_edges = np.maximum(self.birth[edges[:, 0]], self.birth[edges[:, 1]])
@@ -146,10 +145,12 @@ class TopologicalFilterImage(MethodLoaderMixin):
         # print(f"Edges:{self.edges}")
 
     def get_BHT(self, *, with_children=False):
+        if self.bht is None or self.bht.children is None:
+            self._update_BHT()
         return self.bht._get_BHT(with_children=with_children)
     
     def get_persistence(self, *, reduced=True):
-        if self.bht.children is None:
+        if self.bht is None or self.bht.children is None:
             self._update_BHT()
         return self.bht.get_persistence(reduced=reduced)
 
@@ -160,5 +161,4 @@ class TopologicalFilterImage(MethodLoaderMixin):
 
 
         
-
 

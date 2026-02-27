@@ -25,9 +25,6 @@ Todo:
 """
 
 import numpy as np
-import networkx as nx
-import itertools
-from collections import Counter
 from .mixins.Method_Loader import MethodLoaderMixin
 from .gwf import GraphWithFaces
 from .bht import BasinHierarchyTree
@@ -45,14 +42,14 @@ class TopologicalFilterGraph(MethodLoaderMixin):
     self.modified = None
     self.G = None # graph structure
     self.pos = None #position for drawing graph
-    self.diagram = [np.array([None]),np.array([None])] #Persistence diagram, with [PH0, PH1]
+    self.diagram = [None, None]  # persistence diagram cache [PH0, PH1]
     self.children = None
     self.persistent_children = None
     self.parent = None
     self.shape = None
     self.gwf = gwf
     self.is_triangulated = is_triangulated
-    self.compute = "dual" if self.dual else "normal"
+    self.compute_mode = "dual" if self.dual else "normal"
     if isinstance(input,np.ndarray):
       self.from_array(input)
     elif input is not None:
@@ -63,7 +60,15 @@ class TopologicalFilterGraph(MethodLoaderMixin):
     """
     # TODO: adapt this class so that it is possible to compute normal 
     # and dual for the same class to optimize
-    self.gwf = GraphWithFaces(F=F, H=H, E=E, signal=signal, compute=self.compute, is_triangulated=self.is_triangulated)
+    self.gwf = GraphWithFaces(
+      F=F,
+      H=H,
+      E=E,
+      signal=signal,
+      compute=self.compute_mode,
+      is_triangulated=self.is_triangulated,
+    )
+    self.diagram = [None, None]
 
 
   ## create a graph with faces from image
@@ -86,11 +91,27 @@ class TopologicalFilterGraph(MethodLoaderMixin):
 
   def _update_BHT(self):
     if self.dual:
-      self.bht.birth = -self.gwf.signal
-      self.bht.parent, self.bht.children, self.bht.root, self.bht.linking_vertex, self.bht.persistent_children, self.bht.positive_pers = self._link_reduce(-self.gwf.signal, self.gwf.dualE, 0)
+      birth = -self.gwf.signal
+      edges = self.gwf.dualE
     else:
-      self.bht.birth = self.gwf.signal
-      self.bht.parent, self.bht.children, self.bht.root, self.bht.linking_vertex, self.bht.persistent_children, self.bht.positive_pers = self._link_reduce(self.gwf.signal, self.gwf.E, 0)
+      birth = self.gwf.signal
+      edges = self.gwf.E
+    self.bht.birth = birth
+    (
+      self.bht.parent,
+      self.bht.children,
+      self.bht.root,
+      self.bht.linking_vertex,
+      self.bht.persistent_children,
+      self.bht.positive_pers,
+    ) = self._link_reduce(birth, edges, 0)
+
+  def _original_vertex_count(self):
+    if self.shape is not None:
+      return self.shape[0] * self.shape[1]
+    if self.is_triangulated:
+      return self.gwf.signal.shape[0] - len(self.gwf.H)
+    return self.gwf.signal.shape[0] - len(self.gwf.F) - len(self.gwf.H)
     
   def low_pers_filter(self, epsilon, *, size_range = None):
       """ computes topological high-pass filtering
@@ -102,22 +123,24 @@ class TopologicalFilterGraph(MethodLoaderMixin):
           np.array: a filtered image
       """
       if self.bht.children is None:
-          self._update_BHT()
+        self._update_BHT()
 
       if size_range is None:
-          modified = self.bht._low_pers_filter(epsilon)
+        modified = self.bht._low_pers_filter(epsilon)
       else:
-          modified = self.bht._lpf_size_filter(epsilon, size_range=size_range)
+        modified = self.bht._lpf_size_filter(epsilon, size_range=size_range)
+
+      n_vertices = self._original_vertex_count()
       if self.shape is not None:
-        if(self.dual):
-            modified = -modified[:self.shape[0]*self.shape[1]]
-        modified = modified.reshape(self.shape)
-        return(modified)
-      else:
-        if(self.dual):
-          n = self.gwf.signal.shape[0] - len(self.gwf.F) - len(self.gwf.H)
-          modified = -modified[:n]
-        return modified
+        if self.dual:
+          modified = -modified[:n_vertices]
+        else:
+          modified = modified[:n_vertices]
+        return modified.reshape(self.shape)
+
+      if self.dual:
+        return -modified[:n_vertices]
+      return modified[:n_vertices]
 
 
   ## returns modified function values in the original array's shape
@@ -138,13 +161,58 @@ class TopologicalFilterGraph(MethodLoaderMixin):
       return(np.reshape(np.array([]),(0,2)))
     return(np.array(PH1))
 
+  @staticmethod
+  def _as_birth_death(pd):
+    pd = np.asarray(pd)
+    if pd.ndim == 2 and pd.shape[0] > 0:
+      return pd[:, :2]
+    return np.empty((0, 2), dtype=float)
+
+  def _base_signal(self):
+    if self.shape is not None:
+      return self.signal.ravel().copy()
+    if self.gwf is None:
+      raise RuntimeError("GraphWithFaces is not initialized. Use compute_gwf or from_array first.")
+    return self.gwf.signal[: self.gwf.n_nodes].copy()
+
   #Returns the persistence diagram as list of numpy arrays [PH0,PH1]
   def get_diagram(self):
-    if np.all(self.diagram[0]) == None:
-      self.diagram[0] = np.array(self.compute())
-    if np.all(self.diagram[1]) == None:
-      self.diagram[1] = self._dualPH0_to_PH1(self.compute(dual=True))
-    return(self.diagram)
+    if self.gwf is None:
+      raise RuntimeError("GraphWithFaces is not initialized. Use compute_gwf or from_array first.")
+
+    if self.diagram[0] is None:
+      if not self.dual:
+        _ = self.low_pers_filter(0)
+        self.diagram[0] = self._as_birth_death(self.bht.get_persistence(reduced=False))
+      else:
+        tfg0 = TopologicalFilterGraph(
+          method=self.method,
+          bht_method=self.bht_method,
+          dual=False,
+          recursive=self.recursive,
+          is_triangulated=self.is_triangulated,
+        )
+        tfg0.compute_gwf(F=self.gwf.F, H=self.gwf.H, E=self.gwf.E, signal=self._base_signal())
+        _ = tfg0.low_pers_filter(0)
+        self.diagram[0] = self._as_birth_death(tfg0.bht.get_persistence(reduced=False))
+
+    if self.diagram[1] is None:
+      if self.dual:
+        _ = self.low_pers_filter(0)
+        self.diagram[1] = self._as_birth_death(self.bht.get_persistence())
+      else:
+        tfg1 = TopologicalFilterGraph(
+          method=self.method,
+          bht_method=self.bht_method,
+          dual=True,
+          recursive=self.recursive,
+          is_triangulated=self.is_triangulated,
+        )
+        tfg1.compute_gwf(F=self.gwf.F, H=self.gwf.H, E=self.gwf.E, signal=self._base_signal())
+        _ = tfg1.low_pers_filter(0)
+        self.diagram[1] = self._as_birth_death(tfg1.bht.get_persistence())
+
+    return self.diagram
 
 
   ## merge families and modify the filtration values.
@@ -189,41 +257,28 @@ class TopologicalFilterGraph(MethodLoaderMixin):
 
   ## Low persistence filter for Graphs
   def _low_pers_filter(self, epsilon=0, dual=False, verbose=False):
-    self.epsilon=epsilon
-    ## mapping from node index to node name
-    self.idx2node = self.vertices.copy()
-    if dual:
-      E = self.dualE
-      sign = -1
-      self.idx2node.extend(self.INF_V)
+    if self.gwf is None:
+      raise RuntimeError("GraphWithFaces is not initialized. Use compute_gwf or from_array first.")
+
+    if dual == self.dual:
+      filtered = self.low_pers_filter(epsilon)
     else:
-      E = self.E
-      sign = 1
+      if self.shape is not None:
+        signal = self.signal.ravel()
+      else:
+        signal = self.gwf.signal[:self.gwf.n_nodes]
+      aux = TopologicalFilterGraph(
+        method=self.method,
+        bht_method=self.bht_method,
+        dual=dual,
+        recursive=self.recursive,
+        is_triangulated=self.is_triangulated,
+      )
+      aux.compute_gwf(self.gwf.F, self.gwf.H, signal, E=self.gwf.E)
+      filtered = aux.low_pers_filter(epsilon)
 
-    ## mapping from node name to node index
-    self.node2idx = {u: i for i,u in enumerate(self.idx2node)}
-    self.modified = np.array([sign*self.filtration[u] for u in self.idx2node]) # the last entry is for the point at infinity
-    E = np.sort([(self.node2idx[u],self.node2idx[v]) for u,v in E],axis=1)[:,::-1] # respect vertex order
-
-    # if use_numba:
-    #   ## TODO: still slower with numba
-    #   self.modified, self.persistence, basin = self.link_reduce(self.modified, E, self.epsilon)
-    # else:
-    #   self.birth = self.modified.copy()
-    #   self.parent = np.arange(len(self.birth))
-    #   self.persistence = [(self.birth.min(),float('inf'))] # list of cycles in the form (birth,death). Initially, the permanent cycle is added.
-    #   # iterating over edges
-    for u,v in E:
-      #print("edge ",(u,v),max(self.birth[ui],self.birth[vi]))
-      # self._link_reduce(u,v)
-      self.modified, self.parent, self.children, self.root, self.linking_vertex, self.persistent_children, self.positive_pers = self._link_reduce(self.modified, E, self.epsilon)
-
-    if dual:
-      self.modified = -self.modified[:-len(self.INF_V)] # remove the infinity point
-      # self.persistence = self.persistence[1:] # remove the permanent cycle since Alexander duality looks at the reduced homology
-      self.idx2node = self.idx2node[:-len(self.INF_V)]
-    # self.persistence = np.where(np.array(self.persistence) > -self.infinite_filtration_value, self.persistence, -np.inf)
-    return {u: self.modified[i] for i,u in enumerate(self.idx2node)}
+    values = np.array(filtered).ravel()
+    return {i: values[i] for i in range(values.shape[0])}
 
 
 

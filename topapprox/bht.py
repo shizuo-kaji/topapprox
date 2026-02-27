@@ -196,6 +196,62 @@ class BasinHierarchyTree():
         """
         return len(self.get_descendants(vertex))
     
+    def _compute_tree_order(self):
+        """Return a DFS traversal order starting at the root."""
+        if self.root is None or self.children is None:
+            return []
+        order = []
+        stack = [self.root]
+        while stack:
+            v = stack.pop()
+            order.append(v)
+            stack.extend(self.children[v])
+        return order
+
+    def _compute_depth_array(self):
+        """Compute depth-to-root for each vertex."""
+        if self.parent is None:
+            return np.array([], dtype=np.int64)
+        depth = np.zeros(len(self.parent), dtype=np.int64)
+        if self.root is None or self.children is None:
+            return depth
+        stack = [(self.root, 0)]
+        while stack:
+            v, d = stack.pop()
+            depth[v] = d
+            for child in self.children[v]:
+                stack.append((child, d + 1))
+        return depth
+
+    def _compute_subtree_sizes(self):
+        """Compute subtree sizes for all vertices."""
+        if self.parent is None:
+            return np.array([], dtype=np.int64)
+        subtree_sizes = np.ones(len(self.parent), dtype=np.int64)
+        order = self._compute_tree_order()
+        for v in reversed(order):
+            for child in self.children[v]:
+                subtree_sizes[v] += subtree_sizes[child]
+        return subtree_sizes
+
+    def _compute_positive_height_array(self):
+        """Compute heights in the positive-persistence subtree."""
+        if self.parent is None:
+            return np.array([], dtype=np.int64)
+        pos_height = np.zeros(len(self.parent), dtype=np.int64)
+        if self.persistent_children is None:
+            return pos_height
+        order = self._compute_tree_order()
+        for v in reversed(order):
+            if len(self.persistent_children[v]) == 0:
+                continue
+            best_child_height = 0
+            for child in self.persistent_children[v]:
+                if pos_height[child] > best_child_height:
+                    best_child_height = pos_height[child]
+            pos_height[v] = best_child_height + 1
+        return pos_height
+
 
     def get_persistence(self, *, reduced=True):
         """
@@ -216,18 +272,44 @@ class BasinHierarchyTree():
             a persistence pair (birth, death, birth_location, death_location, basin_size).
         """
 
-        # if not self.persistence is None:
-        #     return self.persistence
+        if self.positive_pers is None or self.birth is None or self.linking_vertex is None:
+            self.persistence = np.array([])
+            return self.persistence
 
-        if not self.dual:
-            #(birth, death, birth_location, death_location, basin_size, depth, height)
-            self.persistence = np.array([[self.birth[v], self.birth[self.linking_vertex[v]], v, 
-                                      self.linking_vertex[v], self.basin_size(v), self.get_depth(v), 
-                                      self.get_positive_pers_height(v)] for v in self.positive_pers])
+        vertices = np.asarray(self.positive_pers, dtype=np.int64)
+        if vertices.size == 0:
+            self.persistence = np.array([])
         else:
-            self.persistence = np.array([[-self.birth[self.linking_vertex[v]], -self.birth[v], self.linking_vertex[v],
-                                           v, self.basin_size(v), self.get_depth(v), 
-                                           self.get_positive_pers_height(v)] for v in self.positive_pers])
+            linking_vertices = self.linking_vertex[vertices]
+            depths = self._compute_depth_array()
+            basin_sizes = self._compute_subtree_sizes()
+            positive_heights = self._compute_positive_height_array()
+
+            if not self.dual:
+                # (birth, death, birth_location, death_location, basin_size, depth, height)
+                self.persistence = np.column_stack(
+                    (
+                        self.birth[vertices],
+                        self.birth[linking_vertices],
+                        vertices,
+                        linking_vertices,
+                        basin_sizes[vertices],
+                        depths[vertices],
+                        positive_heights[vertices],
+                    )
+                )
+            else:
+                self.persistence = np.column_stack(
+                    (
+                        -self.birth[linking_vertices],
+                        -self.birth[vertices],
+                        linking_vertices,
+                        vertices,
+                        basin_sizes[vertices],
+                        depths[vertices],
+                        positive_heights[vertices],
+                    )
+                )
         self._describe_pers = """[birth, death, birth_vertex, death_vertex, basin_size, depth_in_BHT, height_in_BHT]
 
             birth:..............birth time of cycle.
@@ -239,10 +321,24 @@ class BasinHierarchyTree():
             height_in_BHT:......the biggest distance from the birth_vertex to a leaf in the subtree of BHT 
                                 having only vertices with positive persistence."""
 
-        if reduced==False:
-            permanent_interval = np.array([[self.birth[self.root], np.inf, self.root, -1, np.inf, self.get_depth(self.root), 
-                                      self.get_positive_pers_height(self.root)]])
-            self.persistence = np.concatenate((self.persistence, permanent_interval))
+        if reduced == False and self.root is not None:
+            depths = self._compute_depth_array()
+            positive_heights = self._compute_positive_height_array()
+            permanent_interval = np.array(
+                [[
+                    self.birth[self.root],
+                    np.inf,
+                    self.root,
+                    -1,
+                    np.inf,
+                    depths[self.root],
+                    positive_heights[self.root],
+                ]]
+            )
+            if self.persistence.ndim == 2:
+                self.persistence = np.concatenate((self.persistence, permanent_interval))
+            else:
+                self.persistence = permanent_interval
         
         return self.persistence
     
@@ -271,7 +367,7 @@ class BasinHierarchyTree():
             A tuple containing (parents, linking_vertex, root). If `with_children` is True, 
             the children of each node are also included.
         """
-        if self.children == None:
+        if self.children is None:
             print("BHT is empty")
             return None
         if with_children:
@@ -445,6 +541,9 @@ class BasinHierarchyTree():
         weight_name: None or str or np.ndarray
         '''
         pd = self.persistence
+        if pd.ndim != 2 or pd.shape[0] == 0:
+            return np.array([])
+
         if weight_name is None:
             return 1
         elif isinstance(weight_name, np.ndarray):
@@ -452,19 +551,19 @@ class BasinHierarchyTree():
         elif weight_name == "basin_size":
             return pd[:,4]
         elif weight_name == "persistence":
-            return np.diff(pd[:,0:2])
+            return pd[:,1] - pd[:,0]
         elif weight_name == "basin_size_x_persistence":
-            return np.diff(pd[:,0:2])*pd[:,4]
-        elif len(weight_name)>24 and weight_name[:24] == "basin_size_+_persistence":
+            return (pd[:,1] - pd[:,0]) * pd[:,4]
+        elif isinstance(weight_name, str) and weight_name.startswith("basin_size_+_persistence"):
             pattern = r"basin_size_\+_persistence\(([\d.]+),([\d.]+)\)"
-            match = re.search(pattern, weight_name)
+            match = re.fullmatch(pattern, weight_name)
             if match:
                 a = float(match.group(1))
                 b = float(match.group(2))
-                return a*pd[:,4] + b*np.diff(pd[:,0:2])
+                return a * pd[:,4] + b * (pd[:,1] - pd[:,0])
             else:
                 raise ValueError(f"Expected the end of the string to be '(number1, number2)', but received {weight_name[24:]}")
-            
+        raise ValueError(f"Unknown weight specification: {weight_name}")
 
 
 
@@ -506,6 +605,8 @@ class BasinHierarchyTree():
         '''
         self.check_persistence_exists()
         pd = self.persistence
+        if pd.ndim != 2 or pd.shape[0] == 0:
+            return np.array([])
         weight = self._get_weight(weight)
         if depth_range is None:
             depth_range = [1, int(np.max(pd[:,5]))] # standard range
@@ -547,6 +648,8 @@ class BasinHierarchyTree():
         '''
         self.check_persistence_exists()
         pd = self.persistence
+        if pd.ndim != 2 or pd.shape[0] == 0:
+            return np.array([])
         weight = self._get_weight(weight)
         if height_range is None:
             height_range = [0, int(np.max(pd[:,6]))] # standard range
@@ -554,5 +657,4 @@ class BasinHierarchyTree():
                          for i in range(height_range[0], height_range[1]+1)])
         N = np.sum(height_distr) if ratio else 1
         return height_distr/N
-
 
